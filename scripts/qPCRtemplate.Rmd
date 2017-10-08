@@ -1,0 +1,93 @@
+
+
+```{r readinData,cache=T}
+filename <- "./161215dme211*.csv"
+datar  <- read.csv(filename)
+datar$minutes <- signif(as.numeric(datar$minutes),digits=4)
+```
+
+```{r quickChecks,cache=T}
+ggplot(datar)+
+  aes(x=factor(minutes),y=cp,col=factor(primers):factor(flask))+
+  theme_bw()+geom_point()+theme(legend.position="bottom")
+```
+
+```{r moreChecks,cache=T}
+datar <- subset(datar,rt)
+aggregate(cp~minutes:primers:flask,
+  data=datar,length)
+aggregate(cp~minutes:primers:flask,
+  data=datar,var,na.action=na.pass)
+```
+
+Use 100% efficiency assumption, I suppose
+
+```{r concCalc,cache=T}
+efficez <- c(1,1,1)
+names(efficez) <- c("1200","gap1","hta1")
+
+datar$conc <- (1+efficez[as.character(datar$primers)])^-datar$cp
+ggplot(datar)+aes(x=minutes,y=conc,col=primers)+
+  facet_wrap(~flask)+
+  theme_bw()+geom_point()+theme(legend.position="bottom")
+```
+
+```{r meanz,cache=T}
+meanz <- aggregate(conc~primers:minutes:flask,
+  data=datar,mean,na.action=na.pass)
+sdz   <- aggregate(conc~primers:minutes:flask,
+  data=datar,sd,na.action=na.pass)
+
+datar$id <- paste(datar$flask,datar$minutes,datar$primers,datar$upshifted,sep="_")
+rm(ratiozspk)
+for (genez in c("gap1")) {
+	for (flaskz in unique(meanz$flask)) {
+		tmpratioz <- data.frame(
+			gene    = genez, 
+			flask   = flaskz,
+			minutes = subset(datar,primers==genez&flask==flaskz)$minutes, 
+			conc    = subset(datar,primers==genez&flask==flaskz)$conc,
+			upshifted = subset(datar,primers==genez&flask==flaskz)$upshifted)
+        tmpratioz$conc <- tmpratioz$conc / apply(tmpratioz,1, function(x){mean(subset(datar,id==paste(x[2], as.numeric(x[3]),"1200",gsub(" ","",x[5]),sep="_"))[,"conc"])})
+        tmpratioz$normconc <- tmpratioz$conc / 
+          aggregate(data=tmpratioz,conc~minutes,mean)[1,2]
+		if (exists("ratiozspk")) {
+			ratiozspk <- rbind(ratiozspk,tmpratioz)
+		} else {
+			ratiozspk <- tmpratioz
+		}
+	}
+}
+ratiozspk$flask <- relevel(ratiozspk$flask,"w")
+```
+
+```{r plotz,cache=T}
+g<- ggplot(ratiozspk)+theme_bw()+
+  aes(x=minutes,y=conc,col=flask)+
+  geom_point()+scale_y_log10()+
+  facet_wrap(~gene,scales="free")
+g
+
+summary(lm(data=subset(ratiozspk,gene=="gap1"),
+  log(conc)~minutes:flask+flask))
+
+g<- ggplot(subset(ratiozspk))+theme_bw()+
+  aes(x=minutes,y=conc,col=flask,group=factor(flask=="q"&upshifted))+
+  geom_point()+scale_y_log10()+
+  facet_wrap(~gene,scales="free")+
+  geom_vline(xintercept=13,linetype="dashed")+
+  stat_smooth(
+    data=subset(ratiozspk,!(minutes==0)&!(minutes>25&flask=="q")),
+    method="lm",se=F)
+g
+
+summary(lm(data=subset(ratiozspk,!(minutes==0)&!(minutes>25&flask=="q")),
+  log(conc)~minutes+minutes:(upshifted==T&flask=="q")+flask))
+
+aggregate(conc~minutes+flask,ratiozspk,mean)
+
+#ggsave("160530datarnorm.png",g,width=6,height=4)
+
+
+```
+

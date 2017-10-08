@@ -1,0 +1,2 @@
+
+echo "CNNNGNNNNNANNN T3MA2M1I2IT3M" | gawk -F' ' '{ numSplit=patsplit($2,a,/[A-Z]/,b); split($1,origSeq,""); pos=1; for (i=0;i<=numSplit;i++) { if (a[i]~/[ACTG]/) {print a[i]" at "pos", orig is "origSeq[pos];pos=pos+1}; pos=pos+b[i] } }'
